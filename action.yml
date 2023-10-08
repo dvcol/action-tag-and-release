@@ -1,0 +1,108 @@
+name: Tag and Release
+description: Create new tag, move previous single digit tag and create gihtub release
+
+
+runs:
+  using: composite
+  steps:
+    - name: Configure Git User
+      shell: bash
+      run: |
+        # ================ Configure Git user  ================
+        
+        git config user.name "github-ci"
+        git config user.email "${{ github.server_url }}"
+
+    - name: Fetch Tags
+      shell: bash
+      run: |
+        # ================ Git Fetch Tags  ================
+
+        git fetch origin --tags --quiet
+
+    - name: Tag and version
+      shell: bash
+      run: |
+        # ================ Tag and version  ================
+        if ! (tag=$(git describe --tags --match="v[0-9]*\.[0-9]*\.*" --abbrev=0))
+        then
+          echo "No tag found, it's the first release"
+          options='--first-release'
+        fi
+
+        npx -y standard-version "$options"
+
+    - name: Push new Tag
+      id: tag
+      shell: bash
+      run: |
+        # ================ Push new Tag  ================
+
+        last_tag_xyz=$(git describe --tags --match="v[0-9]*\.[0-9]*\.*" --abbrev=0)
+        echo -e "Last x.y.z tag found '\033[0;34m${last_tag_xyz}\033[0m'"
+
+        last_tag=$(git describe --tags --match="v[0-9]" --abbrev=0 || echo "")
+        echo -e "Last single digit tag found '\033[0;34m${last_tag}\033[0m'"
+
+        if [[ -z "${last_tag}" ]]
+        then
+        
+          new_tag="v1"
+        
+          echo -e "Creating new tag '\033[0;34m${new_tag}\033[0m'"
+          git tag ${new_tag}
+        
+        elif [[ ${last_tag_xyz} = ${last_tag}* ]]
+        then
+        
+          new_tag="${last_tag}"
+        
+          echo -e "Relocating previous tag '\033[0;34m${new_tag}\033[0m'"
+          git tag ${new_tag} -f
+        
+        else
+        
+          new_version=$((${last_tag#*v}+1))
+          new_tag="v${new_version}"
+        
+          echo -e "Creating new tag '\033[0;34m${new_tag}\033[0m'"
+          git tag ${new_tag}
+        
+        fi
+        
+        echo "new-tag=${new_tag}" >> $GITHUB_OUTPUT
+        echo "new-tag-xyz=${last_tag_xyz}" >> $GITHUB_OUTPUT
+
+    - name: Push tags and changelog
+      shell: bash
+      env:
+        new-tag: ${{ steps.tag.outputs.new-tag }}
+        new-tag-xyz: ${{ steps.tag.outputs.new-tag-xyz }}
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        # ================ Push tags and changelog  ================
+
+        # push new tag and changelog - TODO - fix this when we can push to protected branch
+        git push origin --follow-tags
+
+
+        # relocate tag if needed
+        [[ -n "${{ env.new-tag-xyz }}" ]] && git push origin ${{ env.new-tag-xyz }}
+        [[ -n "${{ env.new-tag }}" ]] && git push origin ${{ env.new-tag }} -f
+
+    - name: Extract changelog
+      shell: bash
+      run: |
+        # ================ Extract changelog  ================
+
+        npx -y extract-changelog-release > RELEASE.md
+
+        cat RELEASE.md
+
+    - name: Push Release to github
+      uses: softprops/action-gh-release@v3
+      with:
+        tag_name: ${{ steps.tag.outputs.new-tag-xyz }}
+        body_path: RELEASE.md
+
+
