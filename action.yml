@@ -5,25 +5,25 @@ description: Create new tag, move previous single digit tag and create gihtub re
 runs:
   using: composite
   steps:
-    - name: Configure Git User
+    - name: ⛙ Configure Git User
       shell: bash
       run: |
-        # ================ Configure Git user  ================
+        # ================ ⛙ Configure Git user  ================
         
         git config user.name "github-ci"
         git config user.email "${{ github.server_url }}"
 
-    - name: Fetch Tags
+    - name: ⛙ Fetch Tags
       shell: bash
       run: |
-        # ================ Git Fetch Tags  ================
+        # ================ ⛙ Git Fetch Tags  ================
 
         git fetch origin --tags --quiet
 
-    - name: Tag and version
+    - name: 🏷️ Tag and version
       shell: bash
       run: |
-        # ================ Tag and version  ================
+        # ================ 🏷️ Tag and version  ================
         if ! (tag=$(git describe --tags --match="v[0-9]*\.[0-9]*\.*" --abbrev=0))
         then
           echo "No tag found, it's the first release"
@@ -32,11 +32,11 @@ runs:
 
         npx -y standard-version "$options"
 
-    - name: Push new Tag
+    - name: 🤖 Compute new Tag
       id: tag
       shell: bash
       run: |
-        # ================ Push new Tag  ================
+        # ================ 🤖 Compute new Tag  ================
 
         last_tag_xyz=$(git describe --tags --match="v[0-9]*\.[0-9]*\.*" --abbrev=0)
         echo -e "Last x.y.z tag found '\033[0;34m${last_tag_xyz}\033[0m'"
@@ -73,14 +73,14 @@ runs:
         echo "new-tag=${new_tag}" >> $GITHUB_OUTPUT
         echo "new-tag-xyz=${last_tag_xyz}" >> $GITHUB_OUTPUT
 
-    - name: Push tags and changelog
+    - name: 🚀 Push tags and changelog
       shell: bash
       env:
         new-tag: ${{ steps.tag.outputs.new-tag }}
         new-tag-xyz: ${{ steps.tag.outputs.new-tag-xyz }}
         GITHUB_TOKEN: ${{ github.token }}
       run: |
-        # ================ Push tags and changelog  ================
+        # ================ 🚀 Push tags and changelog  ================
 
         # push new tag and changelog - TODO - fix this when we can push to protected branch
         git push origin --follow-tags
@@ -90,7 +90,7 @@ runs:
         [[ -n "${{ env.new-tag-xyz }}" ]] && git push origin ${{ env.new-tag-xyz }}
         [[ -n "${{ env.new-tag }}" ]] && git push origin ${{ env.new-tag }} -f
 
-    - name: Extract changelog
+    - name: 📋️ Extract changelog
       shell: bash
       run: |
         # ================ Extract changelog  ================
@@ -99,10 +99,8 @@ runs:
 
         cat RELEASE.md
 
-    - name: Push Release to github
+    - name: 📦 Push Release to github
       uses: softprops/action-gh-release@v3
       with:
         tag_name: ${{ steps.tag.outputs.new-tag-xyz }}
         body_path: RELEASE.md
-
-
